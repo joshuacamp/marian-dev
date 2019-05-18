@@ -900,7 +900,6 @@ private:
 // C = sum_{v in V}(-logsoftmax(A)[v] * indices[v])
 struct MultiLabelCrossEntropyNodeOp : public NaryNodeOp {
   MultiLabelCrossEntropyNodeOp(Expr a, Expr indices) : NaryNodeOp({a, indices}, newShape(a)) {
-    matchOrAbort<IndexType>(indices->value_type());
     int rows   = a->shape().elements() / a->shape()[-1];
     int labels = indices->shape().elements() / indices->shape()[-1];
     ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);

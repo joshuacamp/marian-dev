@@ -192,6 +192,7 @@ Expr softmax(Expr a, Expr zeroOneMask, int axis = -1);
 
 Expr logsoftmax(Expr a);
 
+Expr multi_label_cross_entropy(Expr a, Expr b);
 Expr cross_entropy(Expr a, Expr b);
 
 Expr scalar_product(Expr a, Expr b, int ax = 0);

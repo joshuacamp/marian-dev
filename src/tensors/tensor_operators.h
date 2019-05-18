@@ -105,6 +105,9 @@ DISPATCH3(SoftmaxGrad, marian::Tensor, marian::Tensor, marian::Tensor)
 DISPATCH2(LogSoftmax, marian::Tensor, marian::Tensor)
 DISPATCH3(LogSoftmaxGrad, marian::Tensor, marian::Tensor, marian::Tensor)
 
+DISPATCH3(MultiLabelCrossEntropy, marian::Tensor, marian::Tensor, marian::Tensor)
+DISPATCH4(MultiLabelCrossEntropyBackward, marian::Tensor, marian::Tensor, marian::Tensor, marian::Tensor)
+
 DISPATCH3(CrossEntropyPick, marian::Tensor, marian::Tensor, marian::Tensor)
 DISPATCH4(CrossEntropyPickBackward, marian::Tensor, marian::Tensor, marian::Tensor, marian::Tensor)
 

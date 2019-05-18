@@ -5,6 +5,7 @@ namespace marian {
 // @TODO, simplify this. Currently here for back-compat
 Ptr<LabelwiseLoss> newLoss(Ptr<Options> options, bool inference) {
   float smoothing = inference ? 0.f : options->get<float>("label-smoothing");
+  bool multiLabel = options->get<bool>("multi-label");
   std::string costType = options->get<std::string>("cost-type", "ce-mean");
   
   if(costType == "ce-rescore") {
@@ -13,7 +14,7 @@ Ptr<LabelwiseLoss> newLoss(Ptr<Options> options, bool inference) {
     ABORT("Check me");
     return New<RescorerLoss>();
   } else {  // same as ce-mean
-    return New<CrossEntropyLoss>(smoothing);
+    return New<CrossEntropyLoss>(smoothing, multiLabel);
   }
 }
 

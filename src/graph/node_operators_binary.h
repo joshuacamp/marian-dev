@@ -895,6 +895,38 @@ private:
   bool not_; // invert result if true
 };
 
+// Computes cross-entropy loss -H(indices, a), where `indices` is the gold
+// distribution over the target vocabulary.
+// C = sum_{v in V}(-logsoftmax(A)[v] * indices[v])
+struct MultiLabelCrossEntropyNodeOp : public NaryNodeOp {
+  MultiLabelCrossEntropyNodeOp(Expr a, Expr indices) : NaryNodeOp({a, indices}, newShape(a)) {
+    matchOrAbort<IndexType>(indices->value_type());
+    int rows   = a->shape().elements() / a->shape()[-1];
+    int labels = indices->shape().elements() / indices->shape()[-1];
+    ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);
+    int cols = a->shape()[-1];
+    int targetVocabulary = indices->shape()[-1];
+    ABORT_IF(rows != labels, "Size of output vocabulary and target vocabulary does not match: {} != {}", cols, targetVocabulary);
+  }
+
+  Shape newShape(Expr a) {
+    Shape shape1 = a->shape();
+    shape1.set(a->shape().size() - 1, 1);
+    return shape1;
+  }
+
+  NodeOps forwardOps() override {
+    return {NodeOp(MultiLabelCrossEntropy(val_, child(0)->val(), child(1)->val()))};
+  }
+
+  NodeOps backwardOps() override {
+    return {NodeOp(MultiLabelCrossEntropyBackward(
+        child(0)->grad(), adj_, child(0)->val(), child(1)->val()))};
+  }
+
+  const std::string type() override { return "ml-x-ent"; }
+};
+
 // In each j-th row, take the corresponding j-th label index i from indices and compute:
 // For each vocabulary item v, the only non-zero element in a row in the sum is the item
 // that matches the label indexed by i (the picked element).

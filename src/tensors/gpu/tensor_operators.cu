@@ -1161,6 +1161,195 @@ void GRUFastBackward(std::vector<Tensor> outputs,
       final);
 }
 
+__global__ void gMultiLabelCrossEntropy(float* out,
+                                        const functional::Shape outShape,
+                                        const float* in,
+                                        const functional::Shape inShape,
+                                        const float* labelDistribution) {
+  int rows = inShape.elements() / inShape.back();
+  int cols = inShape.back();
+
+  for(int bid = 0; bid < rows; bid += gridDim.x) {
+    int j = bid + blockIdx.x;
+    if(j < rows) {
+      const float* sp = in + j * cols;
+      const float* pr = labelDistribution + j * cols;
+
+      extern __shared__ float _share[];
+      float* _max = _share;
+
+      _max[threadIdx.x] = sp[threadIdx.x];
+      for(int tid = 1; tid < cols; tid += blockDim.x) {
+        int id = tid + threadIdx.x;
+        if(id < cols) {
+          if(sp[id] > _max[threadIdx.x])
+            _max[threadIdx.x] = sp[id];
+        }
+      }
+      __syncthreads();
+      int len = blockDim.x;
+      while(len != 1) {
+        __syncthreads();
+        int skip = (len + 1) >> 1;
+        if(threadIdx.x < (len >> 1)) {
+          if(_max[threadIdx.x + skip] > _max[threadIdx.x]) {
+            _max[threadIdx.x] = _max[threadIdx.x + skip];
+          }
+        }
+        len = (len + 1) >> 1;
+      }
+      __syncthreads();
+      float max = _max[0];
+      __syncthreads();
+
+      float* _sum = _share;
+      _sum[threadIdx.x] = 0.0;
+      for(int tid = 0; tid < cols; tid += blockDim.x) {
+        int id = tid + threadIdx.x;
+        if(id < cols) {
+          _sum[threadIdx.x] += __expf(sp[id] - max);
+        }
+      }
+      __syncthreads();
+      len = blockDim.x;
+      while(len != 1) {
+        __syncthreads();
+        int skip = (len + 1) >> 1;
+        if(threadIdx.x < (len >> 1))
+          _sum[threadIdx.x] += _sum[threadIdx.x + skip];
+        len = (len + 1) >> 1;
+      }
+      __syncthreads();
+      float log_sum = __logf(_sum[0]);
+      __syncthreads();
+
+      // cross-entropy
+      float* _ce = _share;
+      _ce[threadIdx.x] = 0.0;
+      for(int tid = 0; tid < cols; tid += blockDim.x) {
+        int id = tid + threadIdx.x;
+        if(id < cols) {
+          _ce[threadIdx.x] += pr[id] * (log_sum - sp[id] + max);
+        }
+      }
+      __syncthreads();
+      len = blockDim.x;
+      while(len != 1) {
+        __syncthreads();
+        int skip = (len + 1) >> 1;
+        if(threadIdx.x < (len >> 1))
+          _ce[threadIdx.x] += _ce[threadIdx.x + skip];
+        len = (len + 1) >> 1;
+      }
+      __syncthreads();
+
+      out[j] = _ce[0];
+    }
+    __syncthreads();
+  }
+}
+
+void MultiLabelCrossEntropy(Tensor out, Tensor in, Tensor indices) {
+  cudaSetDevice(out->getDeviceId().no);
+
+  int rows = in->shape().elements() / in->shape().back();
+  int cols = in->shape().back();
+
+  int blocks = std::min(MAX_BLOCKS, (int)rows);
+  int threads = std::min(MAX_THREADS, (int)cols);
+  int shared = sizeof(float) * threads;
+
+  gMultiLabelCrossEntropy<<<blocks, threads, shared>>>(
+      out->data(), out->shape(), in->data(), in->shape(), indices->data());
+}
+
+__global__ void gMultiLabelCrossEntropyBackward(float* out,
+                                          const functional::Shape outShape,
+                                          const float* adj,
+                                          const float* in,
+                                          const float* labelDistribution) {
+  int rows = outShape.elements() / outShape.back();
+  int cols = outShape.back();
+  for(int bid = 0; bid < rows; bid += gridDim.x) {
+    int j = bid + blockIdx.x;
+    if(j < rows) {
+      const float* sp = in + j * cols;
+      const float* pr = labelDistribution + j * cols;
+      float* so = out + j * cols;
+
+      extern __shared__ float _share[];
+      float* _max = _share;
+
+      _max[threadIdx.x] = sp[threadIdx.x];
+      for(int tid = 1; tid < cols; tid += blockDim.x) {
+        int id = tid + threadIdx.x;
+        if(id < cols) {
+          if(sp[id] > _max[threadIdx.x])
+            _max[threadIdx.x] = sp[id];
+        }
+      }
+      __syncthreads();
+      int len = blockDim.x;
+      while(len != 1) {
+        __syncthreads();
+        int skip = (len + 1) >> 1;
+        if(threadIdx.x < (len >> 1)) {
+          if(_max[threadIdx.x + skip] > _max[threadIdx.x]) {
+            _max[threadIdx.x] = _max[threadIdx.x + skip];
+          }
+        }
+        len = (len + 1) >> 1;
+      }
+      __syncthreads();
+      float max = _max[0];
+      __syncthreads();
+
+      float* _sum = _share;
+      _sum[threadIdx.x] = 0.0;
+      for(int tid = 0; tid < cols; tid += blockDim.x) {
+        int id = tid + threadIdx.x;
+        if(id < cols) {
+          float ex = __expf(sp[id] - max);
+          _sum[threadIdx.x] += ex;
+        }
+      }
+      __syncthreads();
+      len = blockDim.x;
+      while(len != 1) {
+        __syncthreads();
+        int skip = (len + 1) >> 1;
+        if(threadIdx.x < (len >> 1))
+          _sum[threadIdx.x] += _sum[threadIdx.x + skip];
+        len = (len + 1) >> 1;
+      }
+      __syncthreads();
+
+      // cross-entropy
+      for(int tid = 0; tid < cols; tid += blockDim.x) {
+        int id = tid + threadIdx.x;
+        if(id < cols) {
+          so[id] += adj[j] * (__expf(sp[id] - max) / _sum[0] - pr[id]);
+        }
+      }
+    }
+    __syncthreads();
+  }
+}
+
+void MultiLabelCrossEntropyBackward(Tensor out, Tensor adj, Tensor a, Tensor indices) {
+  cudaSetDevice(out->getDeviceId().no);
+
+  int rows = out->shape().elements() / out->shape().back();
+  int cols = out->shape().back();
+
+  int blocks = std::min(MAX_BLOCKS, (int)rows);
+  int threads = std::min(MAX_THREADS, (int)cols);
+  int shared = sizeof(float) * threads;
+
+  gMultiLabelCrossEntropyBackward<<<blocks, threads, shared>>>(
+      out->data(), out->shape(), adj->data(), a->data(), indices->data());
+}
+
 __global__ void gCrossEntropyPick(float* out,
                                   const functional::Shape outShape,
                                   const float* in,

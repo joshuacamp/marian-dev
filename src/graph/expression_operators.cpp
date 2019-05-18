@@ -519,6 +519,10 @@ Expr swapAxes(Expr x, int axis1, int axis2)
   return transpose(x, axes);
 }
 
+Expr multi_label_cross_entropy(Expr a, Expr indices) {
+  return Expression<MultiLabelCrossEntropyNodeOp>(a, indices);
+}
+
 Expr cross_entropy(Expr a, Expr indices) {
   return Expression<CrossEntropyNodeOp>(a, indices);
 }

@@ -318,16 +318,22 @@ public:
  */
 class CrossEntropyLoss : public LabelwiseLoss {
 public:
-  CrossEntropyLoss(float labelSmoothing)
+  CrossEntropyLoss(float labelSmoothing, bool multiLabel)
   : LabelwiseLoss(/*axes=*/{-2, -3}), // cross-entropy already reduces over axis -1
-    labelSmoothing_(labelSmoothing) {}
+    labelSmoothing_(labelSmoothing),
+    multiLabel_(multiLabel) {}
 
-  CrossEntropyLoss(const std::vector<int>& axes, float labelSmoothing)
+  CrossEntropyLoss(const std::vector<int>& axes, float labelSmoothing, bool multiLabel)
   : LabelwiseLoss(axes), // cross-entropy already reduces over axis -1
-    labelSmoothing_(labelSmoothing) {}
+    labelSmoothing_(labelSmoothing),
+    multiLabel_(multiLabel) {}
 
 protected:
   float labelSmoothing_; // interpolation factor for label smoothing, see below
+
+  // True when axis -1 of labelIndices is a probability distribution over all labels,
+  // rather than the index of the gold label.
+  bool multiLabel_;
 
   virtual Expr compute(Expr logits, Expr labelIndices,
                        Expr mask = nullptr, Expr labelWeights = nullptr) override {
@@ -335,7 +341,14 @@ protected:
     // for bert training or classification the time dimension is lot.
     // Here safeguard against 2d classifier output, adds 1 on the left, non-op.
 
-    Expr ce = cross_entropy(logits, labelIndices);
+    Expr ce;
+    if (multiLabel_) {
+      // In this case, labelIndices[-1] is a probability distribution over
+      // output labels.
+      ce = multi_label_cross_entropy(logits, labelIndices);
+    } else {
+      ce = cross_entropy(logits, labelIndices);
+    }
 
     if(labelSmoothing_ > 0) {
       // @TODO: add this to CE kernels instead

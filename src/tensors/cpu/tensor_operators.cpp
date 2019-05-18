@@ -665,6 +665,73 @@ void GRUFastBackward(std::vector<Tensor> outputs,
   }
 }
 
+void MultiLabelCrossEntropy(Tensor out, Tensor in, Tensor labelIndices) {
+  matchOrAbort<IndexType>(labelIndices->type());
+
+  // Shape& outShape = out_->shape();
+  Shape& inShape = in->shape();
+
+  int rows = inShape.elements() / inShape.back();
+  int cols = inShape.back();
+
+  #pragma omp parallel for
+  for(int j = 0; j < rows; ++j) {
+    const float* sp = in->data() + j * cols;
+    const float* pr = labelIndices->data() + j * cols;
+    float max = sp[0];
+    #pragma omp simd reduction(max : max)
+    for(int i = 1; i < cols; ++i) {
+      max = std::max(max, sp[i]);
+    }
+
+    float sum = 0.f;
+    #pragma omp simd reduction(+ : sum)
+    for(int i = 0; i < cols; ++i) {
+      sum += std::exp(sp[i] - max);
+    }
+
+    float cross_entropy = 0.f;
+    #pragma omp simd reduction(+ : sum)
+    for(int i = 0; i < cols; ++i) {
+      cross_entropy += pr[i] * (std::log(sum) - sp[i] + max);
+    }
+    out->data()[j] = cross_entropy;
+  }
+}
+
+void MultiLabelCrossEntropyBackward(Tensor out,
+                          Tensor adj,
+                          Tensor in,
+                          Tensor labelIndices) {
+  matchOrAbort<IndexType>(labelIndices->type());
+
+  // Shape& outShape = out_->shape();
+  Shape& inShape = in->shape();
+
+  int rows = inShape.elements() / inShape.back();
+  int cols = inShape.back();
+
+  #pragma omp parallel for
+  for(int j = 0; j < rows; ++j) {
+    const float* sp = in->data() + j * cols;
+    float* so = out->data() + j * cols;
+    const float* pr = labelIndices->data() + j * cols;
+    float max = sp[0];
+    for(int i = 1; i < cols; ++i) {
+      max = std::max(max, sp[i]);
+    }
+
+    float sum = 0.f;
+    for(int i = 0; i < cols; ++i) {
+      sum += std::exp(sp[i] - max);
+    }
+
+    for(int i = 0; i < cols; ++i) {
+      so[i] += adj->data()[j] * (std::exp(sp[i] - max) / sum - pr[i]);
+    }
+  }
+}
+
 void CrossEntropyPick(Tensor out, Tensor in, Tensor labelIndices) {
   matchOrAbort<IndexType>(labelIndices->type());
 

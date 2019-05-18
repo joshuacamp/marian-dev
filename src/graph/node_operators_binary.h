@@ -906,7 +906,8 @@ struct MultiLabelCrossEntropyNodeOp : public NaryNodeOp {
     ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);
     int cols = a->shape()[-1];
     int targetVocabulary = indices->shape()[-1];
-    ABORT_IF(rows != labels, "Size of output vocabulary and target vocabulary does not match: {} != {}", cols, targetVocabulary);
+    ABORT_IF(rows != labels, "Size of output vocabulary and target vocabulary does not match: {} != {}",
+             cols, targetVocabulary);
   }
 
   Shape newShape(Expr a) {

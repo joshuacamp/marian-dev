@@ -666,8 +666,6 @@ void GRUFastBackward(std::vector<Tensor> outputs,
 }
 
 void MultiLabelCrossEntropy(Tensor out, Tensor in, Tensor labelIndices) {
-  matchOrAbort<IndexType>(labelIndices->type());
-
   // Shape& outShape = out_->shape();
   Shape& inShape = in->shape();
 
@@ -703,8 +701,6 @@ void MultiLabelCrossEntropyBackward(Tensor out,
                           Tensor adj,
                           Tensor in,
                           Tensor labelIndices) {
-  matchOrAbort<IndexType>(labelIndices->type());
-
   // Shape& outShape = out_->shape();
   Shape& inShape = in->shape();
 

@@ -343,8 +343,6 @@ protected:
 
     Expr ce;
     if (multiLabel_) {
-      // In this case, labelIndices[-1] is a probability distribution over
-      // output labels.
       ce = multi_label_cross_entropy(logits, labelIndices);
     } else {
       ce = cross_entropy(logits, labelIndices);

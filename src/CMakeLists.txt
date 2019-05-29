@@ -27,6 +27,7 @@ add_library(marian STATIC
   data/corpus_sqlite.cpp
   data/corpus_nbest.cpp
   data/text_input.cpp
+  data/synonym_matrix.cpp
 
   3rd_party/cnpy/cnpy.cpp
   3rd_party/ExceptionWithCallStack.cpp

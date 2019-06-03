@@ -38,6 +38,7 @@ const std::set<std::string> PATHS = {
   "input",            // except: stdin
   "output",           // except: stdout
   "pretrained-model",
+  "syn-path",
   "data-weighting",
   "log"
   // TODO: Handle the special value in helper functions
@@ -415,6 +416,12 @@ void ConfigParser::addOptionsTraining(cli::CLIWrapper& cli) {
   cli.add<bool>("--multi-node-overlap",
      "Overlap model computations with MPI communication",
      true);
+
+  // synonym options
+  cli.add<bool>("--multi-label",
+     "Enable multi-label cross-entropy loss");
+  cli.add<std::string>("--syn-path", "Path to file containing synonym matrix", "data");
+
   // add ULR settings
   addSuboptionsULR(cli);
   // clang-format on

@@ -179,10 +179,6 @@ private:
 
   Ptr<rnn::RNN> constructDecoderRNN(Ptr<ExpressionGraph> graph,
                                     Ptr<DecoderState> state) {
-    if(opt<bool>("multi-label") && options_->has("syn-path")) {
-      std::string path = opt<std::string>("syn-path");
-      synonymMatrix_ = New<data::SynonymMatrix>(path);
-    }
     float dropoutRnn = inference_ ? 0 : opt<float>("dropout-rnn");
     auto rnn = rnn::rnn()                                          //
         ("type", opt<std::string>("dec-cell"))                     //
@@ -242,7 +238,12 @@ private:
   }
 
 public:
-  DecoderS2S(Ptr<Options> options) : DecoderBase(options) {}
+  DecoderS2S(Ptr<Options> options) : DecoderBase(options) {
+    if(opt<bool>("multi-label") && options_->has("syn-path")) {
+      std::string path = opt<std::string>("syn-path");
+      synonymMatrix_ = New<data::SynonymMatrix>(path);
+    }
+  }
 
   virtual Ptr<DecoderState> startState(
       Ptr<ExpressionGraph> graph,

@@ -71,13 +71,10 @@ public:
     if(shortlist_) {
       yData = graph->indices(shortlist_->mappedIndices());
     } else if(synonymMatrix_) {
-      std::vector<Expr> targetDistributions;
-      for(auto index : subBatch->data()) {
-        auto targetDistribution = (*synonymMatrix_)[index];
-        targetDistributions.push_back(
-            graph->constant({dimVoc}, inits::from_vector(targetDistribution)));
-      }
-      yData = concatenate(targetDistributions, /*axis =*/ -1);
+      int length = subBatch->data().size();
+      auto targetDistributions =  (*synonymMatrix_)[subBatch->data()];
+      yData = graph->constant({length, dimVoc},
+                              inits::from_vector(targetDistributions));
     } else {
       yData = graph->indices(subBatch->data());
     }

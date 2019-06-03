@@ -900,12 +900,15 @@ private:
 // C = sum_{v in V}(-logsoftmax(A)[v] * indices[v])
 struct MultiLabelCrossEntropyNodeOp : public NaryNodeOp {
   MultiLabelCrossEntropyNodeOp(Expr a, Expr indices) : NaryNodeOp({a, indices}, newShape(a)) {
-    int rows   = a->shape().elements() / a->shape()[-1];
-    int labels = indices->shape().elements() / indices->shape()[-1];
-    ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);
     int cols = a->shape()[-1];
     int targetVocabulary = indices->shape()[-1];
-    ABORT_IF(rows != labels, "Size of output vocabulary and target vocabulary does not match: {} != {}",
+    int rows   = a->shape().elements() / a->shape()[-1];
+    int labels = indices->shape().elements() / indices->shape()[-1];
+    ABORT_IF(rows != labels,
+             "Number of examples and labels does not match: {} != {}",
+             a->shape(), indices->shape());
+    ABORT_IF(cols != targetVocabulary,
+             "Size of output vocabulary and target vocabulary does not match: {} != {}",
              cols, targetVocabulary);
   }
 

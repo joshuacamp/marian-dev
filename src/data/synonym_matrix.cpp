@@ -20,26 +20,31 @@ void SynonymMatrix::load(const std::string& path) {
     }
     if(item.name == "indptr") {
       indptr_.resize(totalSize);
+      size_ = totalSize;
       std::copy((int*)item.data(), ((int*)item.data()) + totalSize, indptr_.begin());
     }
     if(item.name == "indices") {
-      indptr_.resize(totalSize);
-      size_ = totalSize;
+      indices_.resize(totalSize);
       std::copy((int*)item.data(), ((int*)item.data()) + totalSize, indices_.begin());
     }
   }
 }
 
-std::vector<float> SynonymMatrix::operator[](const Word& id) {
-  std::vector<float> targetDistribution;
-  targetDistribution.resize(size_);
-  std::fill(targetDistribution.begin(), targetDistribution.end(), 0.f);
-  // TODO: check out-of-bounds
-  int len = indptr_[id + 1] - indptr_[id];
-  for (int j = 0; j < len; ++j) {
-    targetDistribution[indices_[indptr_[j]]] = data_[indices_[indptr_[j]]];
+std::vector<float> SynonymMatrix::operator[](const std::vector<Word>& ids) {
+  // TODO: comment.
+  std::vector<float> targetDists;
+  int rows = ids.size();
+  targetDists.resize(rows * size_);
+  std::fill(targetDists.begin(), targetDists.end(), 0.f);
+  for (int i = 0; i < rows; ++i) {
+    int id = ids[i];
+    int len = indptr_[id + 1] - indptr_[id];
+    for (int j = 0; j < len; ++j) {
+      targetDists[(size_*i) + indices_[indptr_[id] + j]] =
+          data_[indptr_[id] + j];
+    }
   }
-  return std::move(targetDistribution);
+  return std::move(targetDists);
 }
 
 }  // namespace data

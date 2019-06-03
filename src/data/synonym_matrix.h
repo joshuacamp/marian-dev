@@ -22,7 +22,7 @@ public:
 
   void load(const std::string& path); 
 
-  std::vector<float> operator[](const Word& id);
+  std::vector<float> operator[](const std::vector<Word>& ids);
 };
 
 } // namespace data
